@@ -1,4 +1,5 @@
 import os
+import ast
 import streamlit as st
 from audio_recorder_streamlit import audio_recorder
 from openai import OpenAI
@@ -18,6 +19,12 @@ if not cookies.ready():
 
 # get errors from cookies
 errors = cookies.get("errors", []) # if no errors, return empty list
+
+
+# convert errors from string to list
+if errors:
+    errors = ast.literal_eval(errors)
+    print(errors)
 
 # display errors in the top left corner
 st.markdown(f"""
@@ -48,11 +55,28 @@ def speech_to_text(user_audio_file_path):
 def text_generation_ai(prompt): # image to text generation api
     client = OpenAI(api_key=OPENAI_API_KEY)
     messages = [
-        {"role": "system", "content": "Invent your own character as a chill language teacher through helpful conversation answer the questions and, correct any grammar mistakes if exists."},
-        {"role": "user", "content": prompt}
+        {
+            "role": "system",
+            "content": "You are a language teacher. A student has recorded a voice message and is asking for feedback. Please provide feedback on the student's pronunciation, grammar, and fluency. Also give overview of the content. Lastly, only if there are any grammatical errors, then strictly write '###' in the beginning of your response"  
+        },
+        {
+            "role": "user",
+            "content": prompt
+        }
+        
     ]
     response = client.chat.completions.create(model="gpt-3.5-turbo-0125", messages=messages)
+    # catch errors and put into cookies
+    if response.choices[0].message.content.startswith("###"):
+        print("before" + str(errors))
+        errors.append(prompt)
+        print("after" + str(errors))
+        cookies['errors'] = str(errors)
+        cookies.save()
+        # remove ### from the response, if it exists
     return response.choices[0].message.content  
+
+
 
 def describe_image(image_url):
     client = OpenAI(api_key=OPENAI_API_KEY)
@@ -98,7 +122,6 @@ def text_to_speech(ai_speech_file_path, api_response_text):
 
 st.title('Language Learning Game')
 
-errors = []
 # accesslocal variables from browser
 # st.write(os.environ.get('OPENAI_API_KEY'))
 
