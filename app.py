@@ -6,6 +6,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from streamlit_cookies_manager import EncryptedCookieManager
 
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -29,6 +30,7 @@ if errors:
 # display errors in the top left corner
 st.markdown(f"""
     <style>
+    
     .top-left {{
         position: fixed;
         top: 30px;
@@ -39,10 +41,48 @@ st.markdown(f"""
         color: red;
     }}
     </style>
-    <div class="top-left">
+    <div class="top-left" id="erBox" onclick="showErrors()">
         <h4>Errors: <span id="err">{len(errors)}</span></h4>
     </div>
+    
     """, unsafe_allow_html=True)
+
+
+if 'button' not in st.session_state:
+    st.session_state.button = False
+
+def click_button():
+    st.session_state.button = not st.session_state.button
+    
+buttonText = "Show Errors" if not st.session_state.button else "Hide Errors"
+
+if len(errors) > 0:
+    st.button(buttonText, on_click=click_button)
+
+if st.session_state.button:
+    # float errors on the screen
+    st.markdown(f"""
+    <style>
+    .errBox {{
+        position: absolute;
+        width: 100%;
+        height: 100vh;
+        top: 70%;
+        left: 50%;
+        transform: translate(-30%, -30%);
+        z-index: 999999999999 !important;
+        backdrop-filter: blur(10px);
+        padding: 10px;
+    }}
+    </style>
+    <div class="errBox" id="errBox">
+        <h1>Errors</h1>
+        <ul> 
+        {"".join([f"<li>{err}</li>" for err in errors])}
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
 
 generated_image_url = 'https://veritusgroup.com/wp-content/uploads/2021/03/talking-big-2021-Mar29.jpg' # placeholder image for first message
 
@@ -57,15 +97,18 @@ def text_generation_ai(prompt): # image to text generation api
     messages = [
         {
             "role": "system",
-            "content": "You are a language teacher. A student has recorded a voice message and is asking for feedback. Please provide feedback on the student's pronunciation, grammar, and fluency. Also give overview of the content. Lastly, only if there are any grammatical errors, then strictly write '###' in the beginning of your response"  
+            "content": "Firstly, only if there are any grammatical errors in users question, then strictly write '###' in the beginning of your response. "  
+        },
+        {
+            "role": "system",
+            "content": "Secondly, You are a language teacher, a student has recorded a voice message and is asking for feedback. Please provide feedback on the student's pronunciation, grammar, and fluency. Also give overview of the content. "  
         },
         {
             "role": "user",
             "content": prompt
         }
-        
     ]
-    response = client.chat.completions.create(model="gpt-3.5-turbo-0125", messages=messages)
+    response = client.chat.completions.create(model="gpt-4o", messages=messages)
     # catch errors and put into cookies
     if response.choices[0].message.content.startswith("###"):
         print("before" + str(errors))
